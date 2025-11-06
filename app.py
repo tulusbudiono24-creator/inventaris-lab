@@ -4,7 +4,7 @@ from fpdf import FPDF
 import os
 
 # ======================================
-#  KONFIGURASI AKUN LOGIN
+#  KONFIGURASI LOGIN
 # ======================================
 users = {
     "admin": "admin123",
@@ -42,7 +42,7 @@ def generate_pdf(df, filename="Laporan_Inventaris.pdf"):
     return filename
 
 # ======================================
-#  HALAMAN LOGIN
+#  LOGIN PAGE
 # ======================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -62,7 +62,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ======================================
-#  DASHBOARD UTAMA
+#  DASHBOARD
 # ======================================
 st.title("🏫 Sistem Manajemen Sarpras SMK KY Ageng Giri")
 st.caption(f"👤 Login sebagai: {st.session_state.username}")
@@ -70,19 +70,34 @@ st.caption(f"👤 Login sebagai: {st.session_state.username}")
 menu = st.sidebar.selectbox("Menu", ["Lihat Data", "Tambah Data", "Laporan PDF", "Logout"])
 
 # ======================================
-#  MENU LIHAT DATA
+#  LIHAT DATA + HAPUS DATA
 # ======================================
 if menu == "Lihat Data":
     st.header("📋 Data Inventaris")
     df = load_data()
+
     ruang_filter = st.selectbox("Filter Ruang", ["Semua"] + sorted(df["Ruang"].unique().tolist()))
     if ruang_filter != "Semua":
         df = df[df["Ruang"] == ruang_filter]
+
     st.dataframe(df)
+
+    # Pilih ID untuk dihapus
+    if not df.empty:
+        id_hapus = st.selectbox("Pilih ID Barang yang akan dihapus:", df["ID"].tolist())
+        if st.button("🗑️ Hapus Data"):
+            df = df[df["ID"] != id_hapus]
+            save_data(df)
+            st.success(f"✅ Data dengan ID {id_hapus} berhasil dihapus!")
+            st.balloons()
+            st.rerun()
+    else:
+        st.info("Belum ada data yang tersimpan.")
+
     st.download_button("📥 Unduh Data CSV", df.to_csv(index=False), file_name="inventaris.csv", mime="text/csv")
 
 # ======================================
-#  MENU TAMBAH DATA
+#  TAMBAH DATA
 # ======================================
 elif menu == "Tambah Data":
     st.header("➕ Tambah Data Inventaris")
@@ -94,23 +109,28 @@ elif menu == "Tambah Data":
     kondisi = st.selectbox("Kondisi", ["Baik", "Rusak Ringan", "Rusak Berat"])
     ruang = st.text_input("Ruang / Lokasi")
     pj = st.text_input("Penanggung Jawab")
-    if st.button("Simpan"):
-        new_data = pd.DataFrame([{
-            "ID": id_baru,
-            "Nama Barang": nama,
-            "Jenis": jenis,
-            "Jumlah": jumlah,
-            "Kondisi": kondisi,
-            "Ruang": ruang,
-            "Penanggung Jawab": pj
-        }])
-        df = pd.concat([df, new_data], ignore_index=True)
-        save_data(df)
-        st.success("✅ Data berhasil disimpan!")
-        st.rerun()
+
+    if st.button("💾 Simpan Data"):
+        if nama and jenis and ruang and pj:
+            new_data = pd.DataFrame([{
+                "ID": id_baru,
+                "Nama Barang": nama,
+                "Jenis": jenis,
+                "Jumlah": jumlah,
+                "Kondisi": kondisi,
+                "Ruang": ruang,
+                "Penanggung Jawab": pj
+            }])
+            df = pd.concat([df, new_data], ignore_index=True)
+            save_data(df)
+            st.success("✅ Data berhasil disimpan!")
+            st.balloons()
+            st.rerun()
+        else:
+            st.warning("⚠️ Lengkapi semua kolom terlebih dahulu.")
 
 # ======================================
-#  MENU LAPORAN PDF
+#  LAPORAN PDF
 # ======================================
 elif menu == "Laporan PDF":
     st.header("🖨️ Cetak Laporan PDF")
@@ -119,13 +139,13 @@ elif menu == "Laporan PDF":
     if ruang_filter != "Semua":
         df = df[df["Ruang"] == ruang_filter]
 
-    if st.button("Buat Laporan PDF"):
+    if st.button("📄 Buat Laporan PDF"):
         filename = generate_pdf(df)
         with open(filename, "rb") as f:
-            st.download_button("📄 Unduh Laporan PDF", f, file_name=filename)
+            st.download_button("📥 Unduh Laporan PDF", f, file_name=filename)
 
 # ======================================
-#  MENU LOGOUT
+#  LOGOUT
 # ======================================
 elif menu == "Logout":
     st.session_state.logged_in = False
