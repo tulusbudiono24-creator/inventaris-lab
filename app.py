@@ -13,7 +13,7 @@ users = {
 }
 
 # ======================================
-#  FILE PENYIMPANAN
+#  FILE DATA
 # ======================================
 DATA_FILE = "inventaris.csv"
 
@@ -22,7 +22,7 @@ if not os.path.exists(DATA_FILE):
     df.to_csv(DATA_FILE, index=False)
 
 # ======================================
-#  FUNGSI PEMBANTU
+#  FUNGSI DATA
 # ======================================
 def load_data():
     return pd.read_csv(DATA_FILE)
@@ -42,7 +42,7 @@ def generate_pdf(df, filename="Laporan_Inventaris.pdf"):
     return filename
 
 # ======================================
-#  LOGIN PAGE
+#  LOGIN SISTEM
 # ======================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -67,74 +67,106 @@ if not st.session_state.logged_in:
 st.title("🏫 Sistem Manajemen Sarpras SMK KY Ageng Giri")
 st.caption(f"👤 Login sebagai: {st.session_state.username}")
 
-menu = st.sidebar.selectbox("Menu", ["Lihat Data", "Tambah Data", "Laporan PDF", "Logout"])
+menu = st.sidebar.selectbox("Menu", ["Data Ruang & PJ", "Input Barang", "Lihat Data", "Laporan PDF", "Logout"])
 
 # ======================================
-#  LIHAT DATA + HAPUS DATA
+#  1️⃣ INPUT RUANG DAN PENANGGUNG JAWAB
 # ======================================
-if menu == "Lihat Data":
-    st.header("📋 Data Inventaris")
-    df = load_data()
+if menu == "Data Ruang & PJ":
+    st.header("🏠 Data Ruang & Penanggung Jawab")
 
-    ruang_filter = st.selectbox("Filter Ruang", ["Semua"] + sorted(df["Ruang"].unique().tolist()))
-    if ruang_filter != "Semua":
-        df = df[df["Ruang"] == ruang_filter]
+    if "ruang_aktif" not in st.session_state:
+        st.session_state.ruang_aktif = None
+        st.session_state.pj_aktif = None
 
-    st.dataframe(df)
+    ruang = st.text_input("Nama Ruang / Lokasi (contoh: Lab Komputer 1, Ruang Guru)")
+    pj = st.text_input("Penanggung Jawab Ruang (nama guru/staf)")
 
-    # Pilih ID untuk dihapus
-    if not df.empty:
-        id_hapus = st.selectbox("Pilih ID Barang yang akan dihapus:", df["ID"].tolist())
-        if st.button("🗑️ Hapus Data"):
-            df = df[df["ID"] != id_hapus]
-            save_data(df)
-            st.success(f"✅ Data dengan ID {id_hapus} berhasil dihapus!")
+    if st.button("Simpan dan Gunakan Ruang Ini"):
+        if ruang and pj:
+            st.session_state.ruang_aktif = ruang
+            st.session_state.pj_aktif = pj
+            st.success(f"✅ Ruang '{ruang}' dengan PJ '{pj}' aktif untuk input data.")
             st.balloons()
-            st.rerun()
-    else:
-        st.info("Belum ada data yang tersimpan.")
+        else:
+            st.warning("⚠️ Harap isi keduanya terlebih dahulu.")
 
-    st.download_button("📥 Unduh Data CSV", df.to_csv(index=False), file_name="inventaris.csv", mime="text/csv")
+    if st.session_state.ruang_aktif:
+        st.info(f"Ruang aktif: **{st.session_state.ruang_aktif}** (PJ: **{st.session_state.pj_aktif}**)")
 
 # ======================================
-#  TAMBAH DATA
+#  2️⃣ INPUT BARANG SESUAI RUANG AKTIF
 # ======================================
-elif menu == "Tambah Data":
-    st.header("➕ Tambah Data Inventaris")
+elif menu == "Input Barang":
+    st.header("➕ Tambah Data Barang")
     df = load_data()
+
+    if not st.session_state.get("ruang_aktif"):
+        st.warning("⚠️ Harap tentukan Ruang dan Penanggung Jawab dulu di menu 'Data Ruang & PJ'")
+        st.stop()
+
     id_baru = len(df) + 1
     nama = st.text_input("Nama Barang")
     jenis = st.text_input("Jenis Barang")
     jumlah = st.number_input("Jumlah", min_value=1)
     kondisi = st.selectbox("Kondisi", ["Baik", "Rusak Ringan", "Rusak Berat"])
-    ruang = st.text_input("Ruang / Lokasi")
-    pj = st.text_input("Penanggung Jawab")
 
-    if st.button("💾 Simpan Data"):
-        if nama and jenis and ruang and pj:
+    if st.button("💾 Simpan Barang"):
+        if nama and jenis:
             new_data = pd.DataFrame([{
                 "ID": id_baru,
                 "Nama Barang": nama,
                 "Jenis": jenis,
                 "Jumlah": jumlah,
                 "Kondisi": kondisi,
-                "Ruang": ruang,
-                "Penanggung Jawab": pj
+                "Ruang": st.session_state.ruang_aktif,
+                "Penanggung Jawab": st.session_state.pj_aktif
             }])
             df = pd.concat([df, new_data], ignore_index=True)
             save_data(df)
-            st.success("✅ Data berhasil disimpan!")
+            st.success("✅ Data barang berhasil disimpan!")
             st.balloons()
             st.rerun()
         else:
-            st.warning("⚠️ Lengkapi semua kolom terlebih dahulu.")
+            st.warning("⚠️ Lengkapi semua kolom sebelum menyimpan.")
 
 # ======================================
-#  LAPORAN PDF
+#  3️⃣ LIHAT DAN HAPUS DATA
+# ======================================
+elif menu == "Lihat Data":
+    st.header("📋 Data Inventaris")
+    df = load_data()
+
+    if df.empty:
+        st.info("Belum ada data inventaris.")
+        st.stop()
+
+    ruang_filter = st.selectbox("Filter Ruang", ["Semua"] + sorted(df["Ruang"].unique().tolist()))
+    if ruang_filter != "Semua":
+        df = df[df["Ruang"] == ruang_filter]
+
+    st.write("Klik tombol 🗑️ di samping untuk menghapus data yang salah:")
+
+    for i, row in df.iterrows():
+        col1, col2 = st.columns([5, 1])
+        col1.write(f"**{row['ID']}. {row['Nama Barang']}** — {row['Jenis']} ({row['Jumlah']} unit, {row['Kondisi']}) • {row['Ruang']} • PJ: {row['Penanggung Jawab']}")
+        if col2.button("🗑️", key=row["ID"]):
+            df = df[df["ID"] != row["ID"]]
+            save_data(df)
+            st.success(f"✅ Data ID {row['ID']} berhasil dihapus!")
+            st.balloons()
+            st.rerun()
+
+# ======================================
+#  4️⃣ LAPORAN PDF
 # ======================================
 elif menu == "Laporan PDF":
     st.header("🖨️ Cetak Laporan PDF")
     df = load_data()
+    if df.empty:
+        st.warning("Belum ada data inventaris untuk dicetak.")
+        st.stop()
+
     ruang_filter = st.selectbox("Filter Ruang", ["Semua"] + sorted(df["Ruang"].unique().tolist()))
     if ruang_filter != "Semua":
         df = df[df["Ruang"] == ruang_filter]
@@ -145,8 +177,10 @@ elif menu == "Laporan PDF":
             st.download_button("📥 Unduh Laporan PDF", f, file_name=filename)
 
 # ======================================
-#  LOGOUT
+#  5️⃣ LOGOUT
 # ======================================
 elif menu == "Logout":
     st.session_state.logged_in = False
+    st.session_state.ruang_aktif = None
+    st.session_state.pj_aktif = None
     st.rerun()
