@@ -2,174 +2,122 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-# =========================
-# KONFIGURASI HALAMAN
-# =========================
-st.set_page_config(
-    page_title="Inventaris Sekolah - V8",
-    page_icon="🧰",
-    layout="wide",
-)
+st.set_page_config(page_title="Inventaris Sekolah", layout="wide")
 
-st.title("🧰 Aplikasi Inventaris Sekolah - Versi 8")
+# --- LOGIN ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# CSS Responsif
-st.markdown("""
-    <style>
-    [data-testid="stAppViewContainer"] {
-        padding: 1rem;
-    }
-    @media (max-width: 768px) {
-        .block-container {
-            padding: 1rem 0.5rem !important;
-        }
-        [data-testid="stSidebar"] {
-            display: none;
-        }
-    }
-    </style>
-""", unsafe_allow_html=True)
+def login():
+    st.title("🔐 Login Admin")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-# =========================
-# DATA AWAL (SESSION STATE)
-# =========================
-if "ruang_df" not in st.session_state:
-    st.session_state["ruang_df"] = pd.DataFrame(columns=["Ruang", "Penanggung Jawab"])
+    if st.button("Login"):
+        if username == st.secrets["general"]["username"] and password == st.secrets["general"]["password"]:
+            st.session_state.logged_in = True
+            st.success("Login berhasil ✅")
+            st.experimental_rerun()
+        else:
+            st.error("Username atau password salah ❌")
 
-if "barang_df" not in st.session_state:
-    st.session_state["barang_df"] = pd.DataFrame(
-        columns=["Ruang", "Penanggung Jawab", "Nama Barang", "Jumlah", "Kondisi", "Tahun Pembelian"]
-    )
-
-# =========================
-# FUNGSI BANTU
-# =========================
-def simpan_ruang(ruang, pj):
-    if ruang and pj:
-        st.session_state["ruang_df"] = pd.concat(
-            [st.session_state["ruang_df"], pd.DataFrame([[ruang, pj]], columns=["Ruang", "Penanggung Jawab"])],
-            ignore_index=True,
-        )
-        st.success("✅ Data ruang berhasil disimpan!")
-    else:
-        st.warning("⚠️ Isi semua kolom sebelum menyimpan!")
-
-def simpan_barang(ruang, pj, nama, jumlah, kondisi, tahun):
-    if not ruang or not pj:
-        st.warning("⚠️ Harap pilih Ruang dan Penanggung Jawab!")
-    elif nama and jumlah and kondisi and tahun:
-        st.session_state["barang_df"] = pd.concat([
-            st.session_state["barang_df"],
-            pd.DataFrame([[ruang, pj, nama, jumlah, kondisi, tahun]],
-                         columns=["Ruang", "Penanggung Jawab", "Nama Barang", "Jumlah", "Kondisi", "Tahun Pembelian"])
-        ], ignore_index=True)
-        st.success("✅ Barang berhasil disimpan!")
-    else:
-        st.warning("⚠️ Lengkapi semua kolom!")
-
-def hapus_barang(index):
-    st.session_state["barang_df"].drop(index, inplace=True)
-    st.session_state["barang_df"].reset_index(drop=True, inplace=True)
-    st.success("🗑️ Data berhasil dihapus.")
+def logout():
+    st.session_state.logged_in = False
     st.experimental_rerun()
 
-def export_excel(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Inventaris")
-    st.download_button(
-        label="📊 Unduh Laporan Excel",
-        data=output.getvalue(),
-        file_name="laporan_inventaris.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+if not st.session_state.logged_in:
+    login()
+    st.stop()
 
-# =========================
-# MENU NAVIGASI
-# =========================
-menu = st.sidebar.radio("📋 Menu", ["Input Ruang", "Input Barang", "Lihat Data Per Ruang", "Laporan Excel (Semua)"])
+# --- LOGOUT BUTTON ---
+st.sidebar.button("Logout", on_click=logout)
+st.sidebar.success("Login sebagai admin ✅")
 
-# =========================
-# 1️⃣ INPUT RUANG
-# =========================
-if menu == "Input Ruang":
-    st.header("🏫 Input Ruang & Penanggung Jawab")
-    ruang = st.text_input("Nama Ruang (contoh: Lab Komputer 1)")
-    pj = st.text_input("Nama Penanggung Jawab (contoh: Tulus Budiono)")
-    if st.button("💾 Simpan Ruang"):
-        simpan_ruang(ruang, pj)
-    if not st.session_state["ruang_df"].empty:
-        st.subheader("📘 Daftar Ruang Terdaftar")
-        st.dataframe(st.session_state["ruang_df"], use_container_width=True)
+# --- DATA STORAGE ---
+if "ruang_data" not in st.session_state:
+    st.session_state.ruang_data = []
+if "barang_data" not in st.session_state:
+    st.session_state.barang_data = []
 
-# =========================
-# 2️⃣ INPUT BARANG
-# =========================
+st.title("🏫 Aplikasi Inventaris Sekolah")
+
+menu = st.sidebar.radio("Menu", ["Input Ruang & Penanggung Jawab", "Input Barang", "Lihat Data per Ruang"])
+
+# --- MENU 1: INPUT RUANG ---
+if menu == "Input Ruang & Penanggung Jawab":
+    st.header("🏢 Tambah Ruang dan Penanggung Jawab")
+    ruang = st.text_input("Nama Ruang")
+    pj = st.text_input("Nama Penanggung Jawab")
+
+    if st.button("Simpan Ruang"):
+        if ruang and pj:
+            st.session_state.ruang_data.append({"Ruang": ruang, "Penanggung Jawab": pj})
+            st.success(f"✅ Data {ruang} berhasil disimpan!")
+        else:
+            st.warning("⚠️ Lengkapi semua kolom!")
+
+    if st.session_state.ruang_data:
+        st.subheader("📋 Daftar Ruang dan Penanggung Jawab")
+        ruang_df = pd.DataFrame(st.session_state.ruang_data)
+        st.dataframe(ruang_df, use_container_width=True)
+
+        hapus = st.selectbox("Pilih Ruang yang akan dihapus", ["-"] + [r["Ruang"] for r in st.session_state.ruang_data])
+        if hapus != "-":
+            if st.button("Hapus Ruang"):
+                st.session_state.ruang_data = [r for r in st.session_state.ruang_data if r["Ruang"] != hapus]
+                st.success(f"🗑️ Ruang {hapus} telah dihapus!")
+
+# --- MENU 2: INPUT BARANG ---
 elif menu == "Input Barang":
-    st.header("🖥️ Input Data Barang Inventaris")
-    if st.session_state["ruang_df"].empty:
-        st.warning("⚠️ Harap isi data Ruang & Penanggung Jawab terlebih dahulu di menu Input Ruang.")
+    st.header("📦 Input Barang Inventaris")
+    if not st.session_state.ruang_data:
+        st.warning("⚠️ Tambahkan dulu Ruang dan Penanggung Jawab di menu pertama!")
     else:
-        col1, col2 = st.columns(2)
-        with col1:
-            ruang = st.selectbox("Pilih Ruang", st.session_state["ruang_df"]["Ruang"].unique())
-        with col2:
-            pj = st.session_state["ruang_df"][st.session_state["ruang_df"]["Ruang"] == ruang]["Penanggung Jawab"].values[0]
-            st.info(f"Penanggung Jawab: **{pj}**")
+        ruang_terpilih = st.selectbox("Pilih Ruang", [r["Ruang"] for r in st.session_state.ruang_data])
+        pj_terpilih = next((r["Penanggung Jawab"] for r in st.session_state.ruang_data if r["Ruang"] == ruang_terpilih), "")
+        st.info(f"Penanggung Jawab: **{pj_terpilih}**")
 
-        nama = st.text_input("Nama Barang")
-        jumlah = st.number_input("Jumlah Barang", min_value=1, step=1)
-        kondisi = st.selectbox("Kondisi Barang", ["Baik", "Rusak Ringan", "Rusak Berat"])
-        tahun = st.number_input("Tahun Pembelian", min_value=2000, max_value=2030, step=1)
+        nama_barang = st.text_input("Nama Barang")
+        jumlah = st.number_input("Jumlah", min_value=1)
+        kondisi = st.selectbox("Kondisi", ["Baik", "Rusak", "Perlu Perbaikan"])
+        tahun = st.number_input("Tahun Pembelian", min_value=2000, max_value=2100, step=1)
 
-        if st.button("💾 Simpan Barang"):
-            simpan_barang(ruang, pj, nama, jumlah, kondisi, tahun)
+        if st.button("Simpan Barang"):
+            st.session_state.barang_data.append({
+                "Ruang": ruang_terpilih,
+                "Penanggung Jawab": pj_terpilih,
+                "Nama Barang": nama_barang,
+                "Jumlah": jumlah,
+                "Kondisi": kondisi,
+                "Tahun": tahun
+            })
+            st.success("✅ Data barang berhasil disimpan!")
 
-# =========================
-# 3️⃣ LIHAT DATA PER RUANG
-# =========================
-elif menu == "Lihat Data Per Ruang":
-    st.header("📋 Lihat Data Barang Per Ruang")
+        if st.session_state.barang_data:
+            st.subheader("📋 Daftar Barang")
+            df_barang = pd.DataFrame(st.session_state.barang_data)
+            st.dataframe(df_barang, use_container_width=True)
 
-    if st.session_state["barang_df"].empty:
-        st.info("Belum ada data barang tersimpan.")
+            hapus_brg = st.selectbox("Pilih Barang yang akan dihapus", ["-"] + [b["Nama Barang"] for b in st.session_state.barang_data])
+            if hapus_brg != "-":
+                if st.button("Hapus Barang"):
+                    st.session_state.barang_data = [b for b in st.session_state.barang_data if b["Nama Barang"] != hapus_brg]
+                    st.success(f"🗑️ Barang {hapus_brg} telah dihapus!")
+
+# --- MENU 3: LIHAT DATA PER RUANG ---
+elif menu == "Lihat Data per Ruang":
+    st.header("📊 Laporan Data Inventaris per Ruang")
+
+    if not st.session_state.barang_data:
+        st.info("Belum ada data barang yang tersimpan.")
     else:
-        ruang_list = st.session_state["barang_df"]["Ruang"].unique().tolist()
-        ruang_terpilih = st.selectbox("Pilih Ruang", ruang_list)
+        ruang_unik = sorted(set(b["Ruang"] for b in st.session_state.barang_data))
+        pilih_ruang = st.selectbox("Pilih Ruang", ruang_unik)
 
-        df_ruang = st.session_state["barang_df"][st.session_state["barang_df"]["Ruang"] == ruang_terpilih]
+        df_laporan = pd.DataFrame([b for b in st.session_state.barang_data if b["Ruang"] == pilih_ruang])
+        st.dataframe(df_laporan, use_container_width=True)
 
-        st.subheader(f"🏠 Data Barang di Ruang: {ruang_terpilih}")
-        st.dataframe(df_ruang, use_container_width=True)
-
-        # Unduh Excel per ruang
+        # Ekspor ke Excel
         output = BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df_ruang.to_excel(writer, index=False, sheet_name=f"{ruang_terpilih}")
-        st.download_button(
-            label="📥 Unduh Excel Ruang Ini",
-            data=output.getvalue(),
-            file_name=f"Laporan_{ruang_terpilih}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-        # Tabel dengan tombol hapus per data
-        st.markdown("### 🗑️ Hapus Data Barang di Ruang Ini")
-        for i, row in df_ruang.iterrows():
-            cols = st.columns([3, 1])
-            with cols[0]:
-                st.write(f"**{row['Nama Barang']}** — {row['Kondisi']} ({row['Jumlah']} unit, {row['Tahun Pembelian']})")
-            with cols[1]:
-                if st.button("Hapus", key=f"hapus_{i}"):
-                    hapus_barang(i)
-
-# =========================
-# 4️⃣ LAPORAN SEMUA DATA
-# =========================
-elif menu == "Laporan Excel (Semua)":
-    st.header("📊 Laporan Semua Data Inventaris")
-    if st.session_state["barang_df"].empty:
-        st.info("Tidak ada data yang bisa diekspor.")
-    else:
-        export_excel(st.session_state["barang_df"])
-        st.dataframe(st.session_state["barang_df"], use_container_width=True)
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df_laporan.to_excel(writer, index=Fals
